@@ -47,7 +47,7 @@ Scope.prototype.$apply = function(expression) {						//apply method for expressi
 };
 
 Scope.prototype.$watchGroup = function(watchFns ,listenerFn, valueEq ){	//function for setup watch expressions
-	var index;
+	var me = this, index;
 	if(_.isArray(watchFns)){										//check that value is empty. 
 		var watcher = new WatcherGroup(watchFns ,listenerFn, valueEq);
 		index = this.$$registredWatchers.push(watcher);
@@ -55,12 +55,12 @@ Scope.prototype.$watchGroup = function(watchFns ,listenerFn, valueEq ){	//functi
 		throw "watchFns is mandatory array parameter";
 	}
 	return function(){
-		this.$$registredWatchers.splice(index, 1);
+		me.$$registredWatchers.splice(index, 1);
 	}
 };
 
 Scope.prototype.$watch  = function(watchFn ,listenerFn, valueEq ){	//function for setup watch expressions
-	var index;
+	var me = this, index;
 	if(_.isFunction(watchFn)){										//check that value is empty. 
 		var watcher = new Watcher(watchFn ,listenerFn, valueEq);	//create new watcher
 		index = this.$$registredWatchers.push(watcher);
@@ -68,17 +68,17 @@ Scope.prototype.$watch  = function(watchFn ,listenerFn, valueEq ){	//function fo
 		throw "watchFn is mandatory function parameter";
 	}
 	return function(){
-		this.$$registredWatchers.splice(index, 1);
+		me.$$registredWatchers.splice(index, 1);
 	}
 };
 
 Scope.prototype.$digest = function(){								//circle in watchExpressions
 	var maxIterations = 20;											//max iterations for circle
 	this.$setPhase("digest");									//set digest phase
-	try {		
-		this.$evalAsync(); 											//eval async expressions
+	try {
 		var watchers = this.$$registredWatchers;
-		while(watchers.length && this.$changesChecker()){				
+		while(watchers.length && this.$changesChecker()){
+			this.$runAsyncQueue();			
 			if(!(maxIterations--)) {
 				throw "Digest iterations overflow";
 			}
@@ -96,18 +96,11 @@ Scope.prototype.$changesChecker = function(){
 		try {
 			var newValue = (watcher instanceof Watcher ? me.$eval(watcher.$$watchExpression) : watcher.$getValues()),
 				oldValue = watcher.oldValue;
-			if(watcher.objectEquality){
-				if(!_.isEqual(newValue, oldValue)){
-					me.$eval(watcher.$$listener);
-					haveChanges = true;
-				}
-			} else {
-				if(newValue == oldValue){
-					me.$eval(watcher.$$listener);
-					haveChanges = true;
-				}
+			if((watcher.$$objectEquality ? !_.isEqual(newValue, oldValue) : newValue != oldValue)){
+				watcher.oldValue = newValue;
+				haveChanges = true;
+				watcher.$$listener(newValue, oldValue, me);
 			}
-			watcher.oldValue = newValue;
 		} catch	(err) {
 			console.error("Digest error: " + err);
 		}
@@ -130,6 +123,12 @@ Scope.prototype.$evalAsync = function(expression) {
 	}
 };
 
+Scope.prototype.$runAsyncQueue = function(expression) {
+	while(this.$$asyncQueue.length){
+		this.$eval(this.$$asyncQueue.shift()); 			//eval async expressions
+	}
+}		
+
 Scope.prototype.$postDigestEval = function(){
 	try{
 		while (this.$$postDigestQueue.length){ 
@@ -140,20 +139,16 @@ Scope.prototype.$postDigestEval = function(){
 	}
 }
 
-
-
 Scope.prototype.$postDigest = function(expression) {
 	this.$$postDigestQueue.push(expression);
 };
 
-Scope.prototype.$eval = function(expression) {
+Scope.prototype.$eval = function(expression, values) {
 	try{
 		if (_.isFunction(expression)){								//check that expression is functions. Else just start $digest
-			return expression(this);
+			return !!values ? expression(values) : expression(this);
 		}
 	} catch(err) {
 		console.error("Expression eval error: " + err);
 	}
 };
-
-
