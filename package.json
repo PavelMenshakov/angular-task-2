@@ -1,0 +1,14 @@
+{
+  "name": "TaskTwo",
+  "namelower": "tasktwo",
+  "version": "0.0.1",
+  "main": "index.html",
+  "description": "AngularJS project. Task 2",
+  "readme": "README.md",
+  "devDependencies": {
+    "lodash": ">=4.x"
+	},
+  "scripts": {
+    "postinstall": "index.html"
+  }
+}
