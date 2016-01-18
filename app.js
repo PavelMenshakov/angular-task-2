@@ -55,7 +55,7 @@ Scope.prototype.$watchGroup = function(watchFns ,listenerFn, valueEq ){	//functi
 		throw "watchFns is mandatory array parameter";
 	}
 	return function(){
-		me.$$registredWatchers.splice(index, 1);
+		me.$$registredWatchers.splice(index - 1, 1);
 	}
 };
 
@@ -68,7 +68,7 @@ Scope.prototype.$watch  = function(watchFn ,listenerFn, valueEq ){	//function fo
 		throw "watchFn is mandatory function parameter";
 	}
 	return function(){
-		me.$$registredWatchers.splice(index, 1);
+		me.$$registredWatchers.splice(index - 1, 1);
 	}
 };
 
@@ -77,8 +77,7 @@ Scope.prototype.$digest = function(){								//circle in watchExpressions
 	this.$setPhase("digest");									//set digest phase
 	try {
 		var watchers = this.$$registredWatchers;
-		while(watchers.length && this.$changesChecker()){
-			this.$runAsyncQueue();			
+		while(this.$changesChecker() && watchers.length){			
 			if(!(maxIterations--)) {
 				throw "Digest iterations overflow";
 			}
@@ -89,15 +88,23 @@ Scope.prototype.$digest = function(){								//circle in watchExpressions
 	}
 };
 
+
+
+Scope.prototype.$isEqual = function(newValue, oldValue){
+	return newValue == oldValue || (typeof newValue === 'number' && typeof oldValue === 'number' &&
+       isNaN(newValue) && isNaN(oldValue));
+}
+
 Scope.prototype.$changesChecker = function(){
 	var me = this,
 		haveChanges = false;
+		this.$runAsyncQueue();
 	_.forEach(this.$$registredWatchers, function(watcher) {
 		try {
 			var newValue = (watcher instanceof Watcher ? me.$eval(watcher.$$watchExpression) : watcher.$getValues()),
 				oldValue = watcher.oldValue;
-			if((watcher.$$objectEquality ? !_.isEqual(newValue, oldValue) : newValue != oldValue)){
-				watcher.oldValue = newValue;
+			if((watcher.$$objectEquality ? !_.isEqual(newValue, oldValue) : !me.$isEqual(newValue, oldValue))){
+				watcher.oldValue = _.cloneDeep(newValue);
 				haveChanges = true;
 				watcher.$$listener(newValue, oldValue, me);
 			}
@@ -139,7 +146,7 @@ Scope.prototype.$postDigestEval = function(){
 	}
 }
 
-Scope.prototype.$postDigest = function(expression) {
+Scope.prototype.$$postDigest = function(expression) {
 	this.$$postDigestQueue.push(expression);
 };
 
