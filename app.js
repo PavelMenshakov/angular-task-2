@@ -104,7 +104,7 @@ Scope.prototype.$changesChecker = function(){
 			var newValue = (watcher instanceof Watcher ? me.$eval(watcher.$$watchExpression) : watcher.$getValues()),
 				oldValue = watcher.oldValue;
 			if((watcher.$$objectEquality ? !_.isEqual(newValue, oldValue) : !me.$isEqual(newValue, oldValue))){
-				watcher.oldValue = _.cloneDeep(newValue);
+				watcher.oldValue = watcher.$$objectEquality ? _.cloneDeep(newValue) : newValue;
 				haveChanges = true;
 				watcher.$$listener(newValue, oldValue, me);
 			}
